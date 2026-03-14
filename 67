@@ -1,0 +1,1126 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
+
+-- ===== CONFIG & LOGIC =====
+local ACCEPTED_KEY = "ghostytop"
+local DISCORD_LINK = "https://discord.gg/M3NkFDM6g9"
+local API_URL = "http://37.221.94.185:10003" -- Bot API
+local PLAYER_HWID = string.gsub(game:GetService("RbxAnalyticsService"):GetClientId(), "%s+", "") -- Unikalny HWID gracza (czyszczenie spacji)
+
+-- ===== LOCALIZATION SYSTEM =====
+local CurrentLang = "PL" -- Default
+local TranslateRegistry = {} 
+
+local UI_Strings = {
+    EN = {
+        lic_title = "🔒 LICENSE VERIFICATION",
+        lic_hint = "Enter your key to continue",
+        lic_verify = "✓ VERIFY LICENSE",
+        lic_get = "🔑 GET KEY",
+        lic_fail = "✖ Invalid Key",
+        lic_success = "✓ Access Granted",
+        
+        tab_info = "INFO",
+        tab_aq = "AUTO QUEST",
+        tab_open = "AUTO OPEN",
+        tab_sell = "AUTO SELL",
+        tab_misc = "MISC",
+        tab_visuals = "VISUALS",
+        tab_settings = "SETTINGS",
+     
+        info_title = "👤 Script Information",
+        info_desc = "Author: zinzelek\nStatus: Undetected\nVersion: 2.5", 
+        
+        aq_title = "🤖 Auto-Quest System",
+        aq_desc = "Fully automated quest completion script.",
+        aq_on = "● ONLINE (Active)",
+        aq_off = "● OFFLINE",
+    
+        open_on = "● OPENING: ON",
+        open_off = "● OPENING: OFF",
+        cd_title = "⏱️ Cooldown Settings",
+        cd_desc = "How long to wait after opening all selected cases.",
+        cd_2m = "⚡ 2 Minutes (Fast)",
+        cd_5m = "🕰️ 5 Minutes (Normal)",
+        cd_10m = "🐢 10 Minutes (Slow)",
+       
+        lvl_title = "📦 Case Levels",
+        lvl_desc = "Select which cases to open in each cycle.",
+
+        sell_title = "💰 Inventory Liquidation",
+        sell_desc = "Automatically sells ALL items in inventory every 10 seconds.",
+        sell_on = "● SELLING ON",
+        sell_off = "● SELLING OFF",
+        
+        misc_fps = "⚡ FPS BOOST (Remove Effects)",
+        misc_rejoin = "🔁 REJOIN SERVER",
+        misc_afk = "🛡️ ANTI-AFK",
+        misc_afk_on = "ANTI-AFK: ACTIVE",
+        misc_afk_off = "ANTI-AFK: DISABLED",
+
+        -- NEW VISUAL STRINGS
+        vis_title = "🎨 Visual Features",
+        vis_desc = "Client-side inventory and currency manipulation.",
+        vis_warn = "⚠️ WARNING: Visual only! Cannot be used/equipped.",
+        vis_add_titan = "SCAN & ADD TITAN",
+        vis_set_money = "SET MONEY",
+        vis_set_xp = "SET XP",
+        vis_set_tix = "SET TICKETS",
+        
+        set_title = "🌐 Settings",
+        set_desc = "System settings.",
+    },
+    PL = {
+        lic_title = "🔒 WERYFIKACJA",
+        lic_hint = "Wpisz klucz aby kontynuować",
+        lic_verify = "✓ ODBLOKUJ",
+        lic_get = "🔑 POBIERZ KLUCZ",
+        lic_fail = "✖ Błędny Klucz",
+        lic_success = "✓ Dostęp Przyznany",
+        
+        tab_info = "INFO",
+        tab_aq = "AUTO QUEST",
+        tab_open = "OTWIERANIE",
+        tab_sell = "AUTO SPRZEDAŻ",
+        tab_misc = "RÓŻNE",
+        tab_visuals = "WIZUALNE",
+        tab_settings = "USTAWIENIA",
+        
+        info_title = "👤 Informacje",
+        info_desc = "Autor: zinzelek\nStatus: Niewykryty\nWersja: 2.5",
+        
+        aq_title = "🤖 System Auto-Quest",
+        aq_desc = "Automatyczne wykonywanie zadań w tle.",
+        aq_on = "● ONLINE (Aktywny)",
+        aq_off = "● OFFLINE",
+        
+        open_on = "● OTWIERANIE: WŁ",
+        open_off = "● OTWIERANIE: WYŁ",
+        cd_title = "⏱️ Ustawienia Czasu",
+        cd_desc = "Ile czekać po otwarciu wszystkich wybranych skrzyń.",
+        cd_2m = "⚡ 2 Minuty (Szybko)",
+        cd_5m = "🕰️ 5 Minut (Normalnie)",
+        cd_10m = "🐢 10 Minut (Wolno)",
+        lvl_title = "📦 Poziomy Skrzyń",
+        lvl_desc = "Wybierz, które skrzynie otwierać w każdym cyklu.",
+
+        sell_title = "💰 Likwidacja Ekwipunku",
+        sell_desc = "Automatycznie sprzedaje WSZYSTKIE przedmioty co 10 sekund.",
+        sell_on = "● SPRZEDAŻ WŁ",
+        sell_off = "● SPRZEDAŻ WYŁ",
+         
+        misc_fps = "⚡ FPS BOOST (Usuń Efekty)",
+        misc_rejoin = "🔁 ODŚWIEŻ SERWER",
+        misc_afk = "🛡️ ANTY-AFK",
+        misc_afk_on = "ANTY-AFK: AKTYWNY",
+        misc_afk_off = "ANTY-AFK: WYŁĄCZONY",
+
+        -- NEW VISUAL STRINGS
+        vis_title = "🎨 Funkcje Wizualne",
+        vis_desc = "Edycja klienta. Zmiany widoczne tylko dla Ciebie.",
+        vis_warn = "⚠️ UWAGA: Tylko wizualne! Nie można używać/zakładać.",
+        vis_add_titan = "SKANUJ I DODAJ TITAN",
+        vis_set_money = "USTAW PIENIĄDZE",
+        vis_set_xp = "USTAW XP",
+        vis_set_tix = "USTAW BILETY",
+        
+        set_title = "🌐 Ustawienia",
+        set_desc = "Ustawienia systemowe.",
+    }
+}
+
+-- Registry Helper
+local function reg(obj, key)
+    TranslateRegistry[obj] = key
+    return obj
+end
+
+-- ===== WERYFIKACJA LICENCJI (LOCAL KEY) =====
+local function verifyLicenseWithAPI(hwid, key)
+    return key == ACCEPTED_KEY
+end
+    
+
+-- Generowanie nowego klucza z API (Xeno exploit)
+local function generateNewKey()
+    local success, response = pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local url = API_URL .. "/generate-key"
+        
+        local response = request({
+            Url = url,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = ""
+        })
+        
+        return HttpService:JSONDecode(response.Body)
+    end)
+    
+    if success and response and response.key then
+        return response.key
+    end
+    return nil
+end
+
+local function updateUI()
+    local lang = UI_Strings[CurrentLang]
+    for obj, key in pairs(TranslateRegistry) do
+        if obj and obj.Parent then
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                obj.Text = lang[key] or obj.Text
+            end
+        end
+    end
+end
+
+-- ===== VISUAL HELPERS =====
+local function tween(obj, t, props, style, dir)
+    style = style or Enum.EasingStyle.Quad
+    dir = dir or Enum.EasingDirection.Out
+    local tw = TweenService:Create(obj, TweenInfo.new(t, style, dir), props)
+    tw:Play()
+    return tw
+end
+
+local function addCorner(inst, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r)
+    c.Parent = inst
+    return c
+end
+
+local function addStroke(inst, thickness, transparency, color)
+    local s = Instance.new("UIStroke")
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0.6
+    s.Color = color or Color3.fromRGB(170, 200, 255)
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = inst
+    return s
+end
+
+local function addGradient(inst, c1, c2, rot)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, c1),
+        ColorSequenceKeypoint.new(1, c2),
+    })
+    g.Rotation = rot or 0
+    g.Parent = inst
+    return g
+end
+
+local function buttonFX(btn)
+    btn.AutoButtonColor = false
+    local baseTrans = btn.BackgroundTransparency
+    local stroke = btn:FindFirstChildOfClass("UIStroke")
+    
+    if not btn:GetAttribute("OrigWidth") then
+        btn:SetAttribute("OrigWidth", btn.Size.X.Offset)
+        btn:SetAttribute("OrigHeight", btn.Size.Y.Offset)
+    end
+
+    btn.MouseEnter:Connect(function()
+        tween(btn, 0.12, {BackgroundTransparency = math.max(0, baseTrans - 0.08)})
+        if stroke then tween(stroke, 0.12, {Transparency = math.max(0, stroke.Transparency - 0.12)}) end
+    end)
+    btn.MouseLeave:Connect(function()
+        tween(btn, 0.12, {BackgroundTransparency = baseTrans})
+        if stroke then tween(stroke, 0.12, {Transparency = math.min(1, stroke.Transparency + 0.12)}) end
+    end)
+    btn.MouseButton1Down:Connect(function()
+        tween(btn, 0.08, {BackgroundTransparency = 0})
+    end)
+    btn.MouseButton1Up:Connect(function()
+        tween(btn, 0.12, {BackgroundTransparency = baseTrans})
+    end)
+end
+
+local function makeDraggable(dragHandle, dragTarget)
+    local dragging = false
+    local dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = dragTarget.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+             local delta = input.Position - dragStart
+            dragTarget.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+         end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+-- ===== UI CONSTRUCTION =====
+if playerGui:FindFirstChild("ScriptHubUI") then playerGui.ScriptHubUI:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ScriptHubUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
+
+-- ===== MOBILE SCALING LOGIC =====
+local uiScale = Instance.new("UIScale")
+uiScale.Parent = screenGui
+
+local function updateScale()
+    local vp = camera.ViewportSize
+    local widthScale = vp.X / 850
+    local heightScale = vp.Y / 600
+    local scale = math.min(1, widthScale, heightScale)
+    uiScale.Scale = scale
+end
+
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+updateScale() -- Run once
+
+local overlay = Instance.new("Frame")
+overlay.Name = "Overlay"
+overlay.Size = UDim2.new(1,0,1,0)
+overlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+overlay.BackgroundTransparency = 0.78
+overlay.Parent = screenGui
+
+-- 1. LICENSE WINDOW
+local licenseWin = Instance.new("Frame")
+licenseWin.Size = UDim2.new(0, 520, 0, 300) 
+licenseWin.Position = UDim2.new(0.5, -260, 0.5, -150)
+licenseWin.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
+licenseWin.BackgroundTransparency = 0.38
+licenseWin.Parent = overlay
+licenseWin.Visible = false
+addCorner(licenseWin, 18)
+addStroke(licenseWin, 1.2, 0.68)
+addGradient(licenseWin, Color3.fromRGB(35, 55, 110), Color3.fromRGB(8, 8, 12), -20)
+
+local lTop = Instance.new("Frame")
+lTop.Size = UDim2.new(1,0,0,56)
+lTop.BackgroundColor3 = Color3.fromRGB(8,8,12)
+lTop.BackgroundTransparency = 0.45
+lTop.Parent = licenseWin
+addCorner(lTop, 18)
+makeDraggable(lTop, licenseWin)
+
+local lTitle = reg(Instance.new("TextLabel"), "lic_title")
+lTitle.BackgroundTransparency = 1
+lTitle.Size = UDim2.new(1,-20,1,0)
+lTitle.Position = UDim2.new(0,10,0,0)
+lTitle.TextColor3 = Color3.fromRGB(245,245,255)
+lTitle.Font = Enum.Font.GothamBold
+lTitle.TextSize = 18
+lTitle.TextXAlignment = Enum.TextXAlignment.Left
+lTitle.Parent = lTop
+
+local langFrame = Instance.new("Frame")
+langFrame.Size = UDim2.new(0, 100, 1, 0)
+langFrame.Position = UDim2.new(1, -110, 0, 0)
+langFrame.BackgroundTransparency = 1
+langFrame.Parent = lTop
+
+local function createKeyLangBtn(txt, x, code)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 40, 0, 24)
+    b.Position = UDim2.new(0, x, 0.5, -12)
+    b.BackgroundColor3 = Color3.fromRGB(40, 60, 100)
+    b.Text = txt
+    b.TextColor3 = Color3.fromRGB(255,255,255)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 12
+    b.Parent = langFrame
+    addCorner(b, 6)
+    addStroke(b, 1, 0.5, Color3.fromRGB(150, 180, 250))
+    
+    b.MouseButton1Click:Connect(function()
+        CurrentLang = code
+        updateUI()
+        tween(b, 0.1, {BackgroundColor3 = Color3.fromRGB(60, 120, 200)})
+        task.wait(0.1)
+        tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 60, 100)})
+    end)
+    return b
+end
+
+createKeyLangBtn("EN", 5, "EN")
+createKeyLangBtn("PL", 50, "PL")
+
+local lHint = reg(Instance.new("TextLabel"), "lic_hint")
+lHint.BackgroundTransparency = 1
+lHint.Position = UDim2.new(0,10,0,56)
+lHint.Size = UDim2.new(1,-20,0,18)
+lHint.TextColor3 = Color3.fromRGB(170,185,210)
+lHint.Font = Enum.Font.Gotham
+lHint.TextSize = 12
+lHint.TextXAlignment = Enum.TextXAlignment.Left
+lHint.Parent = licenseWin
+
+-- Debug: Wyświetlenie HWID gracza (przycisk do skopiowania)
+local hwidDebug = Instance.new("TextButton")
+hwidDebug.BackgroundTransparency = 0.8
+hwidDebug.BackgroundColor3 = Color3.fromRGB(20, 30, 60)
+hwidDebug.Position = UDim2.new(0,10,0,265)
+hwidDebug.Size = UDim2.new(1,-20,0,20)
+hwidDebug.TextColor3 = Color3.fromRGB(100,150,255)
+hwidDebug.Font = Enum.Font.Gotham
+hwidDebug.TextSize = 10
+hwidDebug.TextXAlignment = Enum.TextXAlignment.Left
+hwidDebug.Text = "HWID: " .. PLAYER_HWID .. " (Kliknij aby skopiować)"
+hwidDebug.Parent = licenseWin
+addCorner(hwidDebug, 6)
+addStroke(hwidDebug, 1, 0.7, Color3.fromRGB(100, 150, 255))
+
+-- Logika kopiowania HWID
+hwidDebug.MouseButton1Click:Connect(function()
+    setclipboard(PLAYER_HWID)
+    local originalText = hwidDebug.Text
+    local originalColor = hwidDebug.TextColor3
+    hwidDebug.Text = "✓ SKOPIOWANO!"
+    hwidDebug.TextColor3 = Color3.fromRGB(100, 255, 100)
+    task.wait(1.5)
+    hwidDebug.Text = originalText
+    hwidDebug.TextColor3 = originalColor
+end)
+
+local inputWrap = Instance.new("Frame")
+inputWrap.Size = UDim2.new(1,-40,0,50)
+inputWrap.Position = UDim2.new(0,20,0,85)
+inputWrap.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+inputWrap.BackgroundTransparency = 0.42
+inputWrap.Parent = licenseWin
+addCorner(inputWrap, 14)
+addStroke(inputWrap, 1, 0.72, Color3.fromRGB(150, 180, 240))
+
+local inputBox = Instance.new("TextBox")
+inputBox.Size = UDim2.new(1,-20,1,0)
+inputBox.Position = UDim2.new(0,15,0,0)
+inputBox.BackgroundTransparency = 1
+inputBox.TextColor3 = Color3.fromRGB(235,240,255)
+inputBox.PlaceholderText = "Key..."
+inputBox.Text = ""
+inputBox.Font = Enum.Font.Gotham
+inputBox.TextSize = 14
+inputBox.TextXAlignment = Enum.TextXAlignment.Left
+inputBox.Parent = inputWrap
+
+local verifyBtn = reg(Instance.new("TextButton"), "lic_verify")
+verifyBtn.Size = UDim2.new(1,-40,0,48)
+verifyBtn.Position = UDim2.new(0,20,0,150)
+verifyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 80)
+verifyBtn.TextColor3 = Color3.fromRGB(240,240,255)
+verifyBtn.Font = Enum.Font.GothamBold
+verifyBtn.TextSize = 14
+verifyBtn.Parent = licenseWin
+addCorner(verifyBtn, 14)
+addStroke(verifyBtn, 1, 0.78, Color3.fromRGB(170,150,255))
+addGradient(verifyBtn, Color3.fromRGB(60,35,120), Color3.fromRGB(18,10,35), -10)
+buttonFX(verifyBtn)
+
+local getKeyBtn = reg(Instance.new("TextButton"), "lic_get")
+getKeyBtn.Size = UDim2.new(1,-40,0,48)
+getKeyBtn.Position = UDim2.new(0,20,0,206)
+getKeyBtn.BackgroundColor3 = Color3.fromRGB(35, 110, 255)
+getKeyBtn.TextColor3 = Color3.fromRGB(255,255,255)
+getKeyBtn.Font = Enum.Font.GothamBold
+getKeyBtn.TextSize = 14
+getKeyBtn.Parent = licenseWin
+addCorner(getKeyBtn, 14)
+addStroke(getKeyBtn, 1, 0.82, Color3.fromRGB(200,220,255))
+addGradient(getKeyBtn, Color3.fromRGB(80, 160, 255), Color3.fromRGB(20, 80, 200), 0)
+buttonFX(getKeyBtn)
+
+-- 2. MAIN WINDOW
+local mainWin = Instance.new("Frame")
+mainWin.Size = UDim2.new(0, 820, 0, 560)
+mainWin.Position = UDim2.new(0.5, -410, 0.5, -280)
+mainWin.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
+mainWin.BackgroundTransparency = 0.42
+mainWin.Visible = true
+mainWin.Parent = overlay
+addCorner(mainWin, 18)
+addStroke(mainWin, 1.2, 0.70)
+addGradient(mainWin, Color3.fromRGB(25, 35, 70), Color3.fromRGB(7, 7, 10), -25)
+
+local mTop = Instance.new("Frame")
+mTop.Size = UDim2.new(1,0,0,56)
+mTop.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+mTop.BackgroundTransparency = 0.48
+mTop.Parent = mainWin
+addCorner(mTop, 18)
+makeDraggable(mTop, mainWin)
+
+local brand = Instance.new("TextLabel")
+brand.BackgroundTransparency = 1
+brand.Size = UDim2.new(1,-240,1,0)
+brand.Position = UDim2.new(0,18,0,0)
+brand.TextXAlignment = Enum.TextXAlignment.Left
+brand.Text = "GHOSTY SHOP"
+brand.TextColor3 = Color3.fromRGB(235,235,255)
+brand.Font = Enum.Font.GothamBold
+brand.TextSize = 18
+brand.Parent = mTop
+
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0,34,0,34)
+minBtn.Position = UDim2.new(1,-82,0,11)
+minBtn.BackgroundColor3 = Color3.fromRGB(25, 30, 60)
+minBtn.Text = "-"
+minBtn.TextColor3 = Color3.fromRGB(230,230,255)
+minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 18
+minBtn.Parent = mTop
+addCorner(minBtn, 10)
+buttonFX(minBtn)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,34,0,34)
+closeBtn.Position = UDim2.new(1,-42,0,11)
+closeBtn.BackgroundColor3 = Color3.fromRGB(85, 20, 25)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 16
+closeBtn.Parent = mTop
+addCorner(closeBtn, 10)
+buttonFX(closeBtn)
+
+local pill = Instance.new("TextButton")
+pill.Size = UDim2.new(0, 170, 0, 40)
+pill.Position = UDim2.new(0.5, -85, 0, 40)
+pill.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
+pill.BackgroundTransparency = 0.25
+pill.Text = "DREAM"
+pill.TextColor3 = Color3.fromRGB(235,235,255)
+pill.Font = Enum.Font.GothamBold
+pill.TextSize = 14
+pill.Visible = false
+pill.Parent = overlay
+addCorner(pill, 999)
+addStroke(pill, 2, 0.35, Color3.fromRGB(140, 90, 255))
+buttonFX(pill)
+
+local sidebar = Instance.new("Frame")
+sidebar.Size = UDim2.new(0, 220, 1, -76)
+sidebar.Position = UDim2.new(0, 14, 0, 62)
+sidebar.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+sidebar.BackgroundTransparency = 0.50
+sidebar.Parent = mainWin
+addCorner(sidebar, 16)
+addStroke(sidebar, 1, 0.86, Color3.fromRGB(140, 170, 230))
+
+local sbLayout = Instance.new("UIListLayout")
+sbLayout.Padding = UDim.new(0, 10)
+sbLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sbLayout.Parent = sidebar
+local sbPad = Instance.new("UIPadding")
+sbPad.PaddingTop = UDim.new(0, 12)
+sbPad.PaddingLeft = UDim.new(0, 12)
+sbPad.PaddingRight = UDim.new(0, 12)
+sbPad.Parent = sidebar
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -262, 1, -76)
+content.Position = UDim2.new(0, 248, 0, 62)
+content.BackgroundTransparency = 1
+content.Parent = mainWin
+
+local pages = {}
+local tabButtons = {}
+
+local function createTab(id, key, order)
+    local btn = reg(Instance.new("TextButton"), key)
+    btn.Size = UDim2.new(1, 0, 0, 44)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    btn.BackgroundTransparency = 0.60
+    btn.TextColor3 = Color3.fromRGB(220,225,245)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.LayoutOrder = order
+    btn.Parent = sidebar
+    addCorner(btn, 12)
+    addStroke(btn, 1, 0.90, Color3.fromRGB(120,140,210))
+    buttonFX(btn)
+    
+    local page = Instance.new("Frame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = content
+    
+    pages[id] = page
+    tabButtons[id] = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        for i, p in pairs(pages) do p.Visible = false end
+        for i, b in pairs(tabButtons) do 
+            tween(b, 0.2, {BackgroundTransparency = 0.6})
+        end
+        page.Visible = true
+        tween(btn, 0.2, {BackgroundTransparency = 0.3})
+    end)
+    return page
+end
+
+local function createCard(page, titleKey, descKey, yPos)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, 0, 0, 130)
+    card.Position = UDim2.new(0, 0, 0, yPos)
+    card.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+    card.BackgroundTransparency = 0.52
+    card.Parent = page
+    addCorner(card, 16)
+    addStroke(card, 1, 0.88, Color3.fromRGB(120,140,210))
+
+    local t = reg(Instance.new("TextLabel"), titleKey)
+    t.BackgroundTransparency = 1
+    t.Size = UDim2.new(1, -24, 0, 30)
+    t.Position = UDim2.new(0, 12, 0, 10)
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = Color3.fromRGB(235,235,255)
+    t.Font = Enum.Font.GothamBold
+    t.TextSize = 14
+    t.Parent = card
+
+    local d = reg(Instance.new("TextLabel"), descKey)
+    d.BackgroundTransparency = 1
+    d.Size = UDim2.new(1, -24, 0, 34)
+    d.Position = UDim2.new(0, 12, 0, 42)
+    d.TextXAlignment = Enum.TextXAlignment.Left
+    d.TextColor3 = Color3.fromRGB(170,185,210)
+    d.Font = Enum.Font.Gotham
+    d.TextSize = 13
+    d.TextWrapped = true
+    d.Parent = card
+    return card
+end
+
+-- ===== PAGE 1: INFO =====
+local infoP = createTab("info", "tab_info", 1)
+createCard(infoP, "info_title", "info_desc", 0)
+
+-- ===== PAGE 2: AUTO QUEST =====
+local aqP = createTab("aq", "tab_aq", 2)
+local aqC = createCard(aqP, "aq_title", "aq_desc", 0)
+local aqBtn = reg(Instance.new("TextButton"), "aq_off")
+aqBtn.Size = UDim2.new(0, 200, 0, 40)
+aqBtn.Position = UDim2.new(0, 12, 0, 80)
+aqBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+aqBtn.TextColor3 = Color3.fromRGB(255,255,255)
+aqBtn.Font = Enum.Font.GothamBold
+aqBtn.TextSize = 14
+aqBtn.Parent = aqC
+addCorner(aqBtn, 12)
+addStroke(aqBtn, 1, 0.8, Color3.fromRGB(255,140,140))
+buttonFX(aqBtn)
+
+local aqActive = false
+aqBtn.MouseButton1Click:Connect(function()
+    aqActive = not aqActive
+    if aqActive then
+        TranslateRegistry[aqBtn] = "aq_on"
+        aqBtn.BackgroundColor3 = Color3.fromRGB(20, 120, 60)
+        task.spawn(function()
+             pcall(function() loadstring(game:HttpGet("https://api.jnkie.com/api/v1/luascripts/public/3887467307793d650e41fc6fb2ea3e931ed330c6c5421503eeb95b4e7b533489/download"))() end)
+        end)
+    else
+        TranslateRegistry[aqBtn] = "aq_off"
+        aqBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+    end
+    updateUI()
+end)
+
+-- ===== PAGE 3: AUTO OPEN =====
+local openP = createTab("open", "tab_open", 3)
+
+local cdC = createCard(openP, "cd_title", "cd_desc", 0)
+cdC.Size = UDim2.new(1, 0, 0, 160)
+
+local cooldownTime = 120 
+local cdButtons = {}
+
+local function createCdBtn(key, time, y, order)
+    local btn = reg(Instance.new("TextButton"), key)
+    btn.Size = UDim2.new(1, -24, 0, 30)
+    btn.Position = UDim2.new(0, 12, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 220)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = cdC
+    addCorner(btn, 8)
+    
+    if time == 120 then 
+        btn.BackgroundColor3 = Color3.fromRGB(20, 120, 60)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+    
+    btn.MouseButton1Click:Connect(function()
+        cooldownTime = time
+        for _, b in pairs(cdButtons) do
+            tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 70), TextColor3 = Color3.fromRGB(200, 200, 220)})
+        end
+        tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 120, 60), TextColor3 = Color3.fromRGB(255, 255, 255)})
+    end)
+     
+    table.insert(cdButtons, btn)
+    return btn
+end
+
+createCdBtn("cd_2m", 120, 50)
+createCdBtn("cd_5m", 300, 85)
+createCdBtn("cd_10m", 600, 120)
+
+local lvlC = createCard(openP, "lvl_title", "lvl_desc", 170)
+lvlC.Size = UDim2.new(1, 0, 0, 180)
+
+local gridFrame = Instance.new("Frame")
+gridFrame.Size = UDim2.new(1, -24, 0, 120)
+gridFrame.Position = UDim2.new(0, 12, 0, 50)
+gridFrame.BackgroundTransparency = 1
+gridFrame.Parent = lvlC
+
+local gridLayout = Instance.new("UIGridLayout")
+gridLayout.CellSize = UDim2.new(0, 80, 0, 30)
+gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
+gridLayout.Parent = gridFrame
+
+local selectedLevels = {}
+local lvlButtons = {}
+
+for i = 10, 120, 10 do
+    local btn = Instance.new("TextButton")
+    btn.Text = "L" .. i
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 220)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.Parent = gridFrame
+    addCorner(btn, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        if selectedLevels[i] then
+            selectedLevels[i] = nil
+            tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 70), TextColor3 = Color3.fromRGB(200, 200, 220)})
+        else
+            selectedLevels[i] = true
+            tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(120, 40, 40), TextColor3 = Color3.fromRGB(255, 255, 255)})
+        end
+    end)
+    lvlButtons[i] = btn
+end
+
+local openBtn = reg(Instance.new("TextButton"), "open_off")
+openBtn.Size = UDim2.new(0, 200, 0, 40)
+openBtn.Position = UDim2.new(0.5, -100, 0, 360)
+openBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+openBtn.TextColor3 = Color3.fromRGB(255,255,255)
+openBtn.Font = Enum.Font.GothamBold
+openBtn.TextSize = 14
+openBtn.Parent = openP
+addCorner(openBtn, 12)
+addStroke(openBtn, 1, 0.8, Color3.fromRGB(255,140,140))
+buttonFX(openBtn)
+
+local openActive = false
+
+openBtn.MouseButton1Click:Connect(function()
+    openActive = not openActive
+    if openActive then
+        TranslateRegistry[openBtn] = "open_on"
+        openBtn.BackgroundColor3 = Color3.fromRGB(20, 120, 60)
+        
+        task.spawn(function()
+            while openActive do
+                local hasSelected = false
+                for lvl, isSelected in pairs(selectedLevels) do
+                    if not openActive then break end
+                    if isSelected then
+                        hasSelected = true
+                        local args = {"LEVEL"..lvl, 1, false, false}
+                        pcall(function()
+                            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+                        end)
+                        task.wait(5) 
+                    end
+                end
+                
+                if not openActive then break end
+                
+                if hasSelected then
+                    local waitStart = tick()
+                    while tick() - waitStart < cooldownTime do
+                        if not openActive then break end
+                        task.wait(1)
+                    end
+                else
+                    task.wait(1)
+                end
+            end
+        end)
+    else
+        TranslateRegistry[openBtn] = "open_off"
+        openBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+    end
+    updateUI()
+end)
+
+-- ===== PAGE 4: AUTO SELL =====
+local sellP = createTab("sell", "tab_sell", 4)
+local sellC = createCard(sellP, "sell_title", "sell_desc", 0)
+local sellBtn = reg(Instance.new("TextButton"), "sell_off")
+sellBtn.Size = UDim2.new(0, 200, 0, 40)
+sellBtn.Position = UDim2.new(0, 12, 0, 80)
+sellBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+sellBtn.TextColor3 = Color3.fromRGB(255,255,255)
+sellBtn.Font = Enum.Font.GothamBold
+sellBtn.TextSize = 14
+sellBtn.Parent = sellC
+addCorner(sellBtn, 12)
+addStroke(sellBtn, 1, 0.8, Color3.fromRGB(255,140,140))
+buttonFX(sellBtn)
+
+local sellActive = false
+local function runAutoSell()
+    local inv = player:FindFirstChild("PlayerData") and player.PlayerData:FindFirstChild("Inventory")
+    if inv then
+        for _, item in pairs(inv:GetChildren()) do
+            if not sellActive then break end
+            local args = {
+                {
+                    {
+                        Wear = item:GetAttribute("Wear") or "Field-Tested",
+                        Stattrak = item:GetAttribute("Stattrak") or false,
+                        Age = item:GetAttribute("Age") or 0,
+                        Name = item.Name
+                    }
+                }
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Sell"):InvokeServer(unpack(args))
+        end
+    end
+end
+
+sellBtn.MouseButton1Click:Connect(function()
+    sellActive = not sellActive
+    if sellActive then
+        TranslateRegistry[sellBtn] = "sell_on"
+        sellBtn.BackgroundColor3 = Color3.fromRGB(20, 120, 60)
+        task.spawn(function()
+            while sellActive do
+                runAutoSell()
+                task.wait(5)
+            end
+        end)
+    else
+        TranslateRegistry[sellBtn] = "sell_off"
+        sellBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+    end
+    updateUI()
+end)
+
+-- ===== PAGE 5: MISC =====
+local miscP = createTab("misc", "tab_misc", 5)
+local miscC = createCard(miscP, "misc_title", "misc_title", 0)
+miscC.Size = UDim2.new(1,0,0,250)
+
+local function makeMiscBtn(key, y, col)
+    local b = reg(Instance.new("TextButton"), key)
+    b.Size = UDim2.new(1, -24, 0, 46)
+    b.Position = UDim2.new(0, 12, 0, y)
+    b.BackgroundColor3 = col
+    b.BackgroundTransparency = 0.15
+    b.TextColor3 = Color3.fromRGB(255,255,255)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    b.Parent = miscC
+    addCorner(b, 14)
+    addStroke(b, 1, 0.75, Color3.fromRGB(200,220,255))
+    buttonFX(b)
+    return b
+end
+
+makeMiscBtn("misc_fps", 40, Color3.fromRGB(45, 105, 255)).MouseButton1Click:Connect(function()
+    for _, v in pairs(Lighting:GetChildren()) do if v:IsA("PostEffect") then v.Enabled = false end end
+end)
+
+makeMiscBtn("misc_rejoin", 96, Color3.fromRGB(255, 140, 20)).MouseButton1Click:Connect(function()
+    TeleportService:Teleport(game.PlaceId, player)
+end)
+
+local afkBtn = makeMiscBtn("misc_afk", 152, Color3.fromRGB(120, 20, 30))
+local afkActive = false
+afkBtn.MouseButton1Click:Connect(function()
+    afkActive = not afkActive
+    if afkActive then
+        TranslateRegistry[afkBtn] = "misc_afk_on"
+        afkBtn.BackgroundColor3 = Color3.fromRGB(20, 120, 60)
+        player.Idled:Connect(function()
+            VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        end)
+    else
+        TranslateRegistry[afkBtn] = "misc_afk_off"
+        afkBtn.BackgroundColor3 = Color3.fromRGB(120, 20, 30)
+    end
+    updateUI()
+end)
+
+-- ===== PAGE 6: VISUALS (NEW) =====
+local visP = createTab("visuals", "tab_visuals", 6)
+local visC = createCard(visP, "vis_title", "vis_desc", 0)
+visC.Size = UDim2.new(1, 0, 0, 320)
+
+-- Warning Label
+local visWarn = reg(Instance.new("TextLabel"), "vis_warn")
+visWarn.BackgroundTransparency = 1
+visWarn.Size = UDim2.new(1, -24, 0, 30)
+visWarn.Position = UDim2.new(0, 12, 0, 80)
+visWarn.TextColor3 = Color3.fromRGB(255, 80, 80)
+visWarn.Font = Enum.Font.GothamBold
+visWarn.TextSize = 12
+visWarn.Parent = visC
+
+local function createVisualRow(yPos, btnKey, placeholder, callback, btnInstance)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -24, 0, 40)
+    frame.Position = UDim2.new(0, 12, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = visC
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(0.4, 0, 1, 0)
+    input.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+    input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    input.PlaceholderText = placeholder
+    input.Text = ""
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 13
+    input.Parent = frame
+    addCorner(input, 10)
+    addStroke(input, 1, 0.5, Color3.fromRGB(80, 100, 160))
+
+    local btn = reg(Instance.new("TextButton"), btnKey)
+    btn.Size = UDim2.new(0.55, 0, 1, 0)
+    btn.Position = UDim2.new(0.45, 0, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 60, 110)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.Parent = frame
+    addCorner(btn, 10)
+    buttonFX(btn)
+
+    btn.MouseButton1Click:Connect(function()
+        callback(input.Text, btn)
+    end)
+end
+
+-- 1. SCAN & ADD TITAN LOGIC
+createVisualRow(120, "vis_add_titan", "Amount...", function(txt, btn)
+    local qty = tonumber(txt)
+    if qty and qty > 0 then
+        -- 1. SCAN SERVER
+        local foundItem = nil
+        for _, p in pairs(Players:GetPlayers()) do
+            -- Check Path 1: Drops
+            if p:FindFirstChild("PlayerData") and p.PlayerData:FindFirstChild("Index") and p.PlayerData.Index:FindFirstChild("Drops") then
+                local check = p.PlayerData.Index.Drops:FindFirstChild("TitanHoloKato2014")
+                if check then foundItem = check break end
+            end
+            -- Check Path 2: Inventory
+            if p:FindFirstChild("PlayerData") and p.PlayerData:FindFirstChild("Inventory") then
+                local check = p.PlayerData.Inventory:FindFirstChild("TitanHoloKato2014")
+                if check then foundItem = check break end
+            end
+        end
+
+        -- 2. ACTION
+        if foundItem then
+            local myInv = player:WaitForChild("PlayerData"):WaitForChild("Inventory")
+            for i = 1, qty do
+                local clone = foundItem:Clone()
+                clone.Parent = myInv
+            end
+            
+            -- Success Effect
+            local originalText = btn.Text
+            btn.Text = "COPIED " .. qty .. "!"
+            local originalCol = btn.BackgroundColor3
+            tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 150, 60)})
+            task.wait(1.5)
+            btn.Text = originalText
+            tween(btn, 0.2, {BackgroundColor3 = originalCol})
+        else
+            -- Fail Effect
+            local originalText = btn.Text
+            btn.Text = "NOT FOUND IN SERVER"
+            local originalCol = btn.BackgroundColor3
+            tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(150, 40, 40)})
+            task.wait(2)
+            btn.Text = originalText
+            tween(btn, 0.2, {BackgroundColor3 = originalCol})
+        end
+    end
+end)
+
+-- 2. Add Money
+createVisualRow(170, "vis_set_money", "Amount...", function(txt, btn)
+    local amount = tonumber(txt)
+    if amount then
+        local val = player:WaitForChild("PlayerData"):WaitForChild("Currencies"):WaitForChild("Balance")
+        val.Value = amount
+        -- Feedback
+        local oldC = btn.BackgroundColor3
+        tween(btn, 0.1, {BackgroundColor3 = Color3.fromRGB(40, 150, 60)})
+        task.wait(0.5)
+        tween(btn, 0.2, {BackgroundColor3 = oldC})
+    end
+end)
+
+-- 3. Add XP
+createVisualRow(220, "vis_set_xp", "Amount...", function(txt, btn)
+    local amount = tonumber(txt)
+    if amount then
+        local val = player:WaitForChild("PlayerData"):WaitForChild("Currencies"):WaitForChild("Experience")
+        val.Value = amount
+        -- Feedback
+        local oldC = btn.BackgroundColor3
+        tween(btn, 0.1, {BackgroundColor3 = Color3.fromRGB(40, 150, 60)})
+        task.wait(0.5)
+        tween(btn, 0.2, {BackgroundColor3 = oldC})
+    end
+end)
+
+-- 4. Add Tickets
+createVisualRow(270, "vis_set_tix", "Amount...", function(txt, btn)
+    local amount = tonumber(txt)
+    if amount then
+        local val = player:WaitForChild("PlayerData"):WaitForChild("Currencies"):WaitForChild("Tickets")
+        val.Value = amount
+        -- Feedback
+        local oldC = btn.BackgroundColor3
+        tween(btn, 0.1, {BackgroundColor3 = Color3.fromRGB(40, 150, 60)})
+        task.wait(0.5)
+        tween(btn, 0.2, {BackgroundColor3 = oldC})
+    end
+end)
+
+
+-- ===== PAGE 7: SETTINGS =====
+local setP = createTab("settings", "tab_settings", 7)
+local setC = createCard(setP, "set_title", "set_desc", 0)
+setC.Size = UDim2.new(1, 0, 0, 150)
+
+local setLangFrame = Instance.new("Frame")
+setLangFrame.Size = UDim2.new(1, -24, 0, 40)
+setLangFrame.Position = UDim2.new(0, 12, 0, 80)
+setLangFrame.BackgroundTransparency = 1
+setLangFrame.Parent = setC
+
+local function createSettingLangBtn(txt, x, code)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 80, 0, 32)
+    b.Position = UDim2.new(0, x, 0, 0)
+    b.BackgroundColor3 = Color3.fromRGB(40, 60, 100)
+    b.Text = txt
+    b.TextColor3 = Color3.fromRGB(255,255,255)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    b.Parent = setLangFrame
+    addCorner(b, 8)
+    addStroke(b, 1, 0.5, Color3.fromRGB(150, 180, 250))
+    buttonFX(b)
+    
+    b.MouseButton1Click:Connect(function()
+        CurrentLang = code
+        updateUI()
+        tween(b, 0.1, {BackgroundColor3 = Color3.fromRGB(60, 120, 200)})
+        task.wait(0.1)
+        tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 60, 100)})
+    end)
+    return b
+end
+
+createSettingLangBtn("ENGLISH", 0, "EN")
+createSettingLangBtn("POLSKI", 90, "PL")
+
+-- ===== LOGIC CONNECTIONS =====
+getKeyBtn.MouseButton1Click:Connect(function()
+    setclipboard(DISCORD_LINK)
+    getKeyBtn.Text = "COPIED"
+    task.wait(1)
+    updateUI()
+end)
+
+verifyBtn.MouseButton1Click:Connect(function()
+    local key = inputBox.Text
+
+    local ok = verifyLicenseWithAPI(PLAYER_HWID, key)
+
+    if ok then
+        TranslateRegistry[verifyBtn] = "lic_success"
+        updateUI()
+
+        task.wait(0.5)
+
+        licenseWin.Visible = false
+        mainWin.Visible = true
+        pages["info"].Visible = true
+
+        for i, b in pairs(tabButtons) do 
+            if i == "info" then
+                tween(b, 0.2, {BackgroundTransparency = 0.3})
+            else
+                tween(b, 0.2, {BackgroundTransparency = 0.6})
+            end
+        end
+    else
+        TranslateRegistry[verifyBtn] = "lic_fail"
+        updateUI()
+        task.wait(1.5)
+        TranslateRegistry[verifyBtn] = "lic_verify"
+        updateUI()
+    end
+end)
+
+minBtn.MouseButton1Click:Connect(function()
+    mainWin.Visible = false
+    pill.Visible = true
+end)
+
+pill.MouseButton1Click:Connect(function()
+    pill.Visible = false
+    mainWin.Visible = true
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+updateUI()
